@@ -63,6 +63,9 @@ class StatsCounter:
             RasterizationStrategy.combined,
         ]
         """
+        Given a layer, i.e. a slice of a dataframe, and a shapefile 
+        returns an iterable of records, containing aggregated values
+        of the observations over the shapes in the shapefile. 
         
         :param strategy: Rasterization strategy to be used
         :param shapefile: A path to shapefile to be used

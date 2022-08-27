@@ -36,7 +36,7 @@ class RasterizationStrategy(Enum):
     A combination of "default" rasterization strategy with 
     affine transformation with downscaling factor = 5
     
-    See get_affine_transform `../../../gridmet/doc/gridmet_tools.html#gridmet.gridmet_tools.get_affine_transform`
+    See `get_affine_transform <../../../gridmet/doc/gridmet_tools.html#gridmet.gridmet_tools.get_affine_transform>`_
     """
 
 

@@ -42,10 +42,10 @@ class PointInRaster:
 
     def __init__(self, raster, affine, x, y):
         self.x = None
-        '''X coordinate of teh point'''
+        '''X coordinate of the point'''
 
         self.y = None
-        '''Y coordinate of teh point'''
+        '''Y coordinate of the point'''
 
         self.window = None
         '''Window representing 2x2 window whose center points encompass point'''

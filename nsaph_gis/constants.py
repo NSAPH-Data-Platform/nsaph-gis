@@ -8,8 +8,8 @@ from enum import Enum
 
 class RasterizationStrategy(Enum):
     """
-    Rasterization Strategy, see details at
-    https://pythonhosted.org/rasterstats/manual.html#rasterization-strategy
+    `Rasterization Strategy  <https://pythonhosted.org/rasterstats/manual.html#rasterization-strategy>`_
+    to rasterize a vector
     """
 
     default = 'default'

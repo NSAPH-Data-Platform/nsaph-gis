@@ -1,3 +1,30 @@
+"""
+This module processes layers of data containing geographic coordinates
+and observed values for a certain parameter (band)
+and returns records containing
+an identifier for a geographic shape and the value of the band
+aggregated over the shape.
+"""
+
+#  Copyright (c) 2021. Harvard University
+#
+#  Developed by Research Software Engineering,
+#  Faculty of Arts and Sciences, Research Computing (FAS RC)
+#  Author: Michael A Bouzinier
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#         http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+#
+
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
@@ -35,6 +62,19 @@ class StatsCounter:
             RasterizationStrategy.all_touched,
             RasterizationStrategy.combined,
         ]
+        """
+        
+        :param strategy: Rasterization strategy to be used
+        :param shapefile: A path to shapefile to be used
+        :param affine: An optional affine transformation to be applied to
+            the coordinates
+        :param layer: A slice of dataframe, containing coordinates and values
+        :param geography: WHat type of geography is to be used: zip codes
+            or counties
+        :return: An iterable of records, containing an identifier
+            of a certain shape with the aggregated value of teh observation
+            for this shape
+        """
 
         stats = []
         if strategy in non_all_touched_strategies:

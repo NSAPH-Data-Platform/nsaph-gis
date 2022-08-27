@@ -1,3 +1,8 @@
+"""
+This module contains Enums used by configuration for
+processing of GIS information
+"""
+
 from enum import Enum
 
 
@@ -7,21 +12,32 @@ class RasterizationStrategy(Enum):
     https://pythonhosted.org/rasterstats/manual.html#rasterization-strategy
     """
 
-    # The default strategy is to include all pixels along the line render path
-    # (for lines), or cells where the center point is within the polygon
-    # (for polygons).
     default = 'default'
+    """
+    The default strategy is to include all pixels along the line render path
+    (for lines), or cells where the center point is within the polygon
+    (for polygons).
+    """
 
-    # Alternate, all_touched strategy, rasterizes the geometry
-    # by including all pixels that it touches.
     all_touched = 'all_touched'
+    """
+    Alternate, all_touched strategy, rasterizes the geometry
+    by including all pixels that it touches.
+    """
 
-    # Calculate statistics using both default and all_touched strategy and
-    # combine results, e.g. using arithmetic means
     combined = 'combined'
+    """
+    Calculate statistics using both default and all_touched strategy and
+    combine results, e.g. using arithmetic means
+    """
 
-    # Equivalent of "default" startegy with factor = 5
     downscale = 'downscale'
+    """
+    A combination of "default" rasterization strategy with 
+    affine transformation with downscaling factor = 5
+    
+    See get_affine_transform `../../../gridmet/doc/gridmet_tools.html#gridmet.gridmet_tools.get_affine_transform`
+    """
 
 
 class Geography(Enum):

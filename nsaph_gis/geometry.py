@@ -1,3 +1,7 @@
+"""
+Utilities to work with points in a raster
+"""
+
 #  Copyright (c) 2021. Harvard University
 #
 #  Developed by Research Software Engineering,
@@ -25,10 +29,27 @@ from rasterstats import point
 
 
 class PointInRaster:
+    """
+    Class denoting a point in a raster. This a wrapper
+    around class rasterstats.point optimizing some operations,
+    primarily the bilinear interpolation
+
+    See also https://pythonhosted.org/rasterstats/_modules/rasterstats/point.html
+    """
+
     COMPLETELY_MASKED = 1
     PARTIALLY_MASKED = 2
 
     def __init__(self, raster, affine, x, y):
+        self.x = None
+        '''X coordinate of teh point'''
+
+        self.y = None
+        '''Y coordinate of teh point'''
+
+        self.window = None
+        '''Window representing 2x2 window whose center points encompass point'''
+
         self.window, unitxy = point.point_window_unitxy(x, y, affine)
         self.x, self.y = unitxy
         self.masked = 0
@@ -50,7 +71,7 @@ class PointInRaster:
         elif m > 0:
             self.masked = self.PARTIALLY_MASKED
 
-    def is_masked(self):
+    def is_masked(self) -> bool:
         return self.masked == self.COMPLETELY_MASKED
 
     def array(self, raster):
@@ -60,6 +81,24 @@ class PointInRaster:
         ]
 
     def bilinear(self, raster) -> Optional[float]:
+        """
+        An optimized version of rasterstats.point function:
+        given a point's window as 2x2 array, and x, y as its coordinates,
+        treat center points as a unit square.
+
+            +---+---+
+            | A | B |      +----+
+            +---+---+  =>  |    |
+            | C | D |      +----+
+            +---+---+
+
+        e.g.: Center of A is at (0, 1) on unit square, D is at (1, 0), etc
+
+        :param raster: Raster, to which teh point belongs
+        :return: the value for the fractional row/col
+                using bilinear interpolation between the cells
+        """
+
         if self.masked == self.COMPLETELY_MASKED:
             return None
 

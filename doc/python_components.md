@@ -1,4 +1,4 @@
-# Python Components
+# GIS Python Modules
 
 ```{toctree}
 ---

@@ -53,15 +53,6 @@ class StatsCounter:
         layer: Iterable,
         geography: Geography
     ) -> Iterable[Record]:
-        non_all_touched_strategies = [
-            RasterizationStrategy.default,
-            RasterizationStrategy.combined,
-            RasterizationStrategy.downscale,
-        ]
-        all_touched_strategies = [
-            RasterizationStrategy.all_touched,
-            RasterizationStrategy.combined,
-        ]
         """
         Given a layer, i.e. a slice of a dataframe, and a shapefile 
         returns an iterable of records, containing aggregated values
@@ -78,6 +69,16 @@ class StatsCounter:
             of a certain shape with the aggregated value of teh observation
             for this shape
         """
+
+        non_all_touched_strategies = [
+            RasterizationStrategy.default,
+            RasterizationStrategy.combined,
+            RasterizationStrategy.downscale,
+        ]
+        all_touched_strategies = [
+            RasterizationStrategy.all_touched,
+            RasterizationStrategy.combined,
+        ]
 
         stats = []
         if strategy in non_all_touched_strategies:

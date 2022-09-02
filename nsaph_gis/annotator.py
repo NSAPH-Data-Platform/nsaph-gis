@@ -1,6 +1,6 @@
 import csv
 import os
-from typing import List
+from typing import List, Optional
 
 import geopandas
 import pandas
@@ -67,11 +67,19 @@ class GISAnnotator:
         return df
 
     def _check_columns(self):
-        if (set(self.columns) & ZIP_COLUMNS) and self.zip_shapes is None:
+        if len(set(self.columns) & ZIP_COLUMNS) < 1 and self.zip_shapes is None:
             raise ValueError('ZIP column is requested, but no zip shape file found')
 
-        if (set(self.columns) & COUNTY_COLUMNS) and self.county_shapes is None:
+        if len(set(self.columns) & COUNTY_COLUMNS) < 1 and self.county_shapes is None:
             raise ValueError('County columns are requested, but no county shape file found')
+
+    @staticmethod
+    def matches(columns: List[str], pattern: str) -> Optional[str]:
+        for c in columns:
+            if c.lower().startswith(pattern.lower()):
+                return c
+        return None
+
 
     def _load_shape_files(self):
         if self.zip_shapes is not None or self.county_shapes is not None:
@@ -84,11 +92,24 @@ class GISAnnotator:
                 data.rename(columns={'ZIP': 'ZCTA'}, inplace=True)
                 self.zip_shapes = data
 
+            elif 'ZCTA' in data.columns:
+                self.zip_shapes = data
+
             elif 'ZCTA5CE10' in data.columns:
                 data.rename(columns={'ZCTA5CE10': 'ZCTA'}, inplace=True)
                 self.zip_shapes = data
 
-            elif 'STATEFP' in data.columns and 'COUNTYFP' in data.columns:
+            elif 'ZCTA5CE20' in data.columns:
+                data.rename(columns={'ZCTA5CE20': 'ZCTA'}, inplace=True)
+                self.zip_shapes = data
+
+            else:
+                c = self.matches(data.columns, "ZCTA")
+                if c is not None:
+                    data.rename(columns={'c': 'ZCTA'}, inplace=True)
+                    self.zip_shapes = data
+
+            if 'STATEFP' in data.columns and 'COUNTYFP' in data.columns:
                 self.county_shapes = data
 
     def _add_shape_columns(

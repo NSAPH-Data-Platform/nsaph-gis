@@ -94,7 +94,7 @@ class PointInRaster:
 
             e.g.: Center of A is at (0, 1) on unit square, D is at (1, 0), etc
 
-        :param raster: Raster, to which teh point belongs
+        :param raster: Raster, to which the point belongs
         :return: the value for the fractional row/col
                 using bilinear interpolation between the cells
         """

@@ -66,7 +66,7 @@ class StatsCounter:
         :param geography: WHat type of geography is to be used: zip codes
             or counties
         :return: An iterable of records, containing an identifier
-            of a certain shape with the aggregated value of teh observation
+            of a certain shape with the aggregated value of the observation
             for this shape
         """
 

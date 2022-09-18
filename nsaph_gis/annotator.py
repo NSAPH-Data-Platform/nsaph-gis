@@ -41,7 +41,7 @@ class GISAnnotator:
 
     def join(self, df: pandas.DataFrame, x='longitude', y='latitude') -> pandas.DataFrame:
         """
-        Adds columns with the labels to teh data
+        Adds columns with the labels to the data
 
         :param df: Incoming data frame
         :param x: A column, containing longitude

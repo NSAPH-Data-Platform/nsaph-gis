@@ -43,5 +43,6 @@ class RasterizationStrategy(Enum):
 class Geography(Enum):
     """Type of geography"""
     zip = 'zip'
+    zcta = 'zcta'
     county = 'county'
     custom = 'custom'

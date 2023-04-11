@@ -23,10 +23,17 @@ Utilities to download shapefiles from US Census website
 
 import os
 import zipfile
+from enum import Enum
 from typing import Tuple
 from urllib import request
 
 from tqdm import tqdm
+
+
+
+class CensusShapeCollection(Enum):
+    genz = 'genz'
+    tiger = 'tiger'
 
 
 class GISDownloader:
@@ -35,16 +42,29 @@ class GISDownloader:
     from https://www.census.gov/
     """
     COUNTY_TEMPLATE = 'https://www2.census.gov/geo/tiger/GENZ{year}/shp/cb_{year}_us_county_500k.zip'
-    ZIP_TEMPLATE = 'https://www2.census.gov/geo/tiger/GENZ{year}/shp/cb_{year}_us_zcta510_500k.zip'
+    ZCTA_GENZ_TEMPLATE = 'https://www2.census.gov/geo/tiger/GENZ{year}/shp/cb_{year}_us_zcta510_500k.zip'
+    ZCTA_TIGER_URLs = {
+        2008: 'https://www2.census.gov/geo/tiger/TIGER2008/tl_2008_us_zcta500.zip',
+        2010: 'https://www2.census.gov/geo/tiger/TIGER2010/ZCTA5/2010/tl_2010_us_zcta510.zip',
+        2015: 'https://www2.census.gov/geo/tiger/TIGER2015/ZCTA5/tl_2015_us_zcta510.zip'
+    }
 
     @classmethod
-    def download_shapes(cls, year: int, output_dir: str = None, strict: bool = False) -> None:
-        cls.download_zip(year, output_dir, strict)
+    def download_shapes(cls, source: CensusShapeCollection, year: int, output_dir: str = None,
+                        strict: bool = False) -> None:
+        cls.download_zcta(CensusShapeCollection.genz, year, output_dir, strict)
+        cls.download_zcta(CensusShapeCollection.tiger, year, output_dir, strict)
         cls.download_county(year, output_dir, strict)
 
     @classmethod
-    def download_zip(cls, year: int, output_dir: str = None, strict: bool = False) -> None:
-        zip_url, is_exact = cls._get_zip_url(year)
+    def download_zcta(cls, source: CensusShapeCollection, year: int,
+                      output_dir: str = None,
+                      strict: bool = False) -> None:
+        if source == CensusShapeCollection.genz:
+            zip_url, is_exact = cls._get_genz_zcta_url(year)
+        else:
+            zip_url, is_exact = cls._get_tiger_zcta_url(year)
+
         if strict and not is_exact:
             raise ValueError(f'There is no census data for year { year }.')
 
@@ -103,15 +123,15 @@ class GISDownloader:
             return cls.COUNTY_TEMPLATE.format(year=year), True
 
     @classmethod
-    def _get_zip_url(cls, year: int) -> Tuple[str, bool]:
+    def _get_genz_zcta_url(cls, year: int) -> Tuple[str, bool]:
         """
             Method returns url to zip shape file for nearest existing year data
         """
         if year > 2020:
-            return cls._get_zip_url(2020)[0], False
+            return cls._get_genz_zcta_url(2020)[0], False
 
         if year in (2012, 2011) or year < 2010:
-            return cls._get_zip_url(2010)[0], False
+            return cls._get_genz_zcta_url(2010)[0], False
 
         if year == 2010:
             return 'https://www2.census.gov/geo/tiger/GENZ2010/gz_2010_us_860_00_500k.zip', True
@@ -120,7 +140,28 @@ class GISDownloader:
             return 'https://www2.census.gov/geo/tiger/GENZ2013/cb_2013_us_zcta510_500k.zip', True
 
         if 2014 <= year <= 2019:
-            return cls.ZIP_TEMPLATE.format(year=year), True
+            return cls.ZCTA_GENZ_TEMPLATE.format(year=year), True
 
         if year == 2020:
             return 'https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_zcta520_500k.zip', True
+
+    @classmethod
+    def _get_tiger_zcta_url(cls, year: int) -> Tuple[str, bool]:
+        """
+            Method returns url to zip shape file for nearest existing year data
+        """
+
+        if year in cls.ZCTA_TIGER_URLs:
+            return cls.ZCTA_TIGER_URLs[year], True
+
+        available_years = sorted(
+            [key for key in cls.ZCTA_TIGER_URLs],
+            reverse=True
+        )
+        for y in available_years:
+            if y <= year:
+                return cls.ZCTA_TIGER_URLs[y], False
+
+        return cls.ZCTA_TIGER_URLs[-1], False
+            
+

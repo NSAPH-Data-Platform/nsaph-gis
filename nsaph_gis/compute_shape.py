@@ -112,6 +112,8 @@ class StatsCounter:
         row = stats[0][0]
         if geography == Geography.zip:
             key = cls._determine_zip_key(row)
+        elif geography == Geography.zcta:
+            key = cls._determine_zcta_key(row)
         elif geography == Geography.county:
             key = cls._determine_county_key(row)
         else:
@@ -131,7 +133,12 @@ class StatsCounter:
 
     @classmethod
     def _determine_zip_key(cls, row) -> Tuple:
-        candidates = ("ZIP", "ZCTA5", "ZCTA5CE10", "ZCTA5CE20")
+        candidates = ("ZIP")
+        return cls._determine_key(row, candidates),
+
+    @classmethod
+    def _determine_zcta_key(cls, row) -> Tuple:
+        candidates = ("ZCTA5", "ZCTA5CE10", "ZCTA5CE20")
         return cls._determine_key(row, candidates),
 
     @classmethod
@@ -146,7 +153,8 @@ class StatsCounter:
         for candidate in candidates:
             if candidate in row['properties']:
                 return candidate
-        raise ValueError(f"Unknown shape format, no expected fields '{ candidates }'")
+        props = str(row['properties'])
+        raise ValueError(f"None of the expected properties found ('{ candidates }'). Available: '{props}'")
 
     @staticmethod
     def _combine(key, r1, r2) -> Record:

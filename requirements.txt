@@ -1,9 +1,1 @@
-geopandas
-numpy
-pandas
-shapely
-rtree
-rasterstats
-tqdm
-
-pytest
+.

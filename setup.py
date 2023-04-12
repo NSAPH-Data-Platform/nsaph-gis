@@ -16,6 +16,16 @@ setup(
     packages=find_packages(),
     include_package_data=True,
     package_data={'nsaph_gis': ['data/*.csv']},
+    install_requires = [
+        "geopandas",
+        "numpy",
+        "pandas",
+        "shapely",
+        "rtree",
+        "rasterstats",
+        "tqdm",
+        "pytest"
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: Harvard University :: Development",

@@ -31,6 +31,7 @@ from typing import Iterable, Optional, Tuple
 import rasterio
 from rasterstats import zonal_stats
 from tqdm import tqdm
+import shapefile
 
 from .constants import RasterizationStrategy, Geography
 
@@ -45,10 +46,25 @@ class Record:
 
 class StatsCounter:
     @classmethod
+    def get_key_for_geography(cls, shpfile: str, geography: Geography) -> Tuple:
+        shape = shapefile.Reader(shpfile)
+        fields = [f[0] for f in shape.fields]
+        if geography == Geography.zip:
+            key = cls._determine_zip_key(fields)
+        elif geography == Geography.zcta:
+            key = cls._determine_zcta_key(fields)
+        elif geography == Geography.county:
+            key = cls._determine_county_key(fields)
+        else:
+            raise ValueError("Unsupported geography: " + str(geography))
+
+        return key
+
+    @classmethod
     def process(
         cls,
         strategy: RasterizationStrategy,
-        shapefile: str,
+        shpfile: str,
         affine: rasterio.Affine,
         layer: Iterable,
         geography: Geography
@@ -59,7 +75,7 @@ class StatsCounter:
         of the observations over the shapes in the shapefile. 
         
         :param strategy: Rasterization strategy to be used
-        :param shapefile: A path to shapefile to be used
+        :param shpfile: A path to shapefile to be used
         :param affine: An optional affine transformation to be applied to
             the coordinates
         :param layer: A slice of dataframe, containing coordinates and values
@@ -69,6 +85,8 @@ class StatsCounter:
             of a certain shape with the aggregated value of the observation
             for this shape
         """
+
+        key = cls.get_key_for_geography(shpfile, geography)
 
         non_all_touched_strategies = [
             RasterizationStrategy.default,
@@ -84,7 +102,7 @@ class StatsCounter:
         if strategy in non_all_touched_strategies:
             stats.append(
                 zonal_stats(
-                    shapefile,
+                    shpfile,
                     layer,
                     stats="mean",
                     affine=affine,
@@ -96,7 +114,7 @@ class StatsCounter:
         if strategy in all_touched_strategies:
             stats.append(
                 zonal_stats(
-                    shapefile,
+                    shpfile,
                     layer,
                     stats="mean",
                     affine=affine,
@@ -110,14 +128,6 @@ class StatsCounter:
             return
 
         row = stats[0][0]
-        if geography == Geography.zip:
-            key = cls._determine_zip_key(row)
-        elif geography == Geography.zcta:
-            key = cls._determine_zcta_key(row)
-        elif geography == Geography.county:
-            key = cls._determine_county_key(row)
-        else:
-            raise ValueError("Unsupported geography: " + str(geography))
 
         for i in tqdm(range(len(stats[0])), total=len(stats[0])):
             if len(stats) == 2:
@@ -150,10 +160,18 @@ class StatsCounter:
 
     @staticmethod
     def _determine_key(row, candidates) -> str:
+        props = None
         for candidate in candidates:
-            if candidate in row['properties']:
-                return candidate
-        props = str(row['properties'])
+            if isinstance(row, dict):
+                if candidate in row['properties']:
+                    return candidate
+                props = str([key for key in row['properties']])
+            elif isinstance(row, list):
+                if candidate in row:
+                    return candidate
+                props = row
+            else:
+                raise ValueError("Unknown type of row: " + str(row))
         raise ValueError(f"None of the expected properties found ('{ candidates }'). Available: '{props}'")
 
     @staticmethod

@@ -46,8 +46,13 @@ class GISDownloader:
     ZCTA_TIGER_URLs = {
         2008: 'https://www2.census.gov/geo/tiger/TIGER2008/tl_2008_us_zcta500.zip',
         2010: 'https://www2.census.gov/geo/tiger/TIGER2010/ZCTA5/2010/tl_2010_us_zcta510.zip',
-        2015: 'https://www2.census.gov/geo/tiger/TIGER2015/ZCTA5/tl_2015_us_zcta510.zip'
     }
+
+    for y in range(2012, 2020):
+        ZCTA_TIGER_URLs[y] = f'https://www2.census.gov/geo/tiger/TIGER{y}/ZCTA5/tl_{y}_us_zcta510.zip'
+    for y in range(2020, 2023):
+        ZCTA_TIGER_URLs[y] = f'https://www2.census.gov/geo/tiger/TIGER{y}/ZCTA520/tl_{y}_us_zcta520.zip'
+
 
     @classmethod
     def download_shapes(cls, source: CensusShapeCollection, year: int, output_dir: str = None,
@@ -162,6 +167,6 @@ class GISDownloader:
             if y <= year:
                 return cls.ZCTA_TIGER_URLs[y], False
 
-        return cls.ZCTA_TIGER_URLs[-1], False
+        return cls.ZCTA_TIGER_URLs[available_years[-1]], False
             
 

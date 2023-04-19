@@ -148,7 +148,7 @@ class StatsCounter:
 
     @classmethod
     def _determine_zcta_key(cls, row) -> Tuple:
-        candidates = ["ZCTA5", "ZCTA5CE10", "ZCTA5CE20"]
+        candidates = ["ZCTA5", "ZCTA5CE00", "ZCTA5CE10", "ZCTA5CE20"]
         return cls._determine_key(row, candidates),
 
     @classmethod

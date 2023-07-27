@@ -26,11 +26,11 @@ aggregated over the shape.
 #
 
 from dataclasses import dataclass
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple, List, Callable, Dict
 
 import rasterio
-from rasterstats import zonal_stats
-from tqdm import tqdm
+from rasterstats import zonal_stats, gen_zonal_stats
+from tqdm import tqdm, trange
 import shapefile
 
 from .constants import RasterizationStrategy, Geography
@@ -40,11 +40,19 @@ NO_DATA = -999  # I do not know what it is, but not setting it causes a warning
 
 @dataclass
 class Record:
-    mean: Optional[float]
+    value: Optional[float]
+    prop: str
+
+
+@dataclass
+class MultiRecord:
+    values: List[Optional[float]]
     prop: str
 
 
 class StatsCounter:
+    statistics = "mean"
+    
     @classmethod
     def get_key_for_geography(cls, shpfile: str, geography: Geography) -> Tuple:
         shape = shapefile.Reader(shpfile)
@@ -59,6 +67,74 @@ class StatsCounter:
             raise ValueError("Unsupported geography: " + str(geography))
 
         return key
+
+    @classmethod
+    def prepare_stats(
+            cls,
+            strategy: RasterizationStrategy,
+            shpfile: str,
+            affine: rasterio.Affine,
+            layer: Iterable,
+            geography: Geography,
+            is_generator: bool
+    ) -> List:
+        """
+        Given a layer, i.e. a slice of a dataframe, and a shapefile
+        returns an iterable of records, containing aggregated values
+        of the observations over the shapes in the shapefile.
+
+        :param strategy: Rasterization strategy to be used
+        :param shpfile: A path to shapefile to be used
+        :param affine: An optional affine transformation to be applied to
+            the coordinates
+        :param layer: A slice of dataframe, containing coordinates and values
+        :param geography: WHat type of geography is to be used: zip codes
+            or counties
+        :return: A list of statistics compute objects
+        """
+
+        if is_generator:
+            stats_function: Callable = gen_zonal_stats
+        else:
+            stats_function: Callable = zonal_stats
+
+        non_all_touched_strategies = [
+            RasterizationStrategy.default,
+            RasterizationStrategy.combined,
+            RasterizationStrategy.downscale,
+        ]
+        all_touched_strategies = [
+            RasterizationStrategy.all_touched,
+            RasterizationStrategy.combined,
+        ]
+
+        stats = []
+        if strategy in non_all_touched_strategies:
+            stats.append(
+                stats_function(
+                    shpfile,
+                    layer,
+                    stats=cls.statistics,
+                    affine=affine,
+                    geojson_out=True,
+                    all_touched=False,
+                    nodata=NO_DATA,
+                )
+            )
+        if strategy in all_touched_strategies:
+            stats.append(
+                stats_function(
+                    shpfile,
+                    layer,
+                    stats=cls.statistics,
+                    affine=affine,
+                    geojson_out=True,
+                    all_touched=True,
+                    nodata=NO_DATA,
+                )
+            )
+
+        return stats
 
     @classmethod
     def process(
@@ -88,58 +164,147 @@ class StatsCounter:
 
         key = cls.get_key_for_geography(shpfile, geography)
 
-        non_all_touched_strategies = [
-            RasterizationStrategy.default,
-            RasterizationStrategy.combined,
-            RasterizationStrategy.downscale,
-        ]
-        all_touched_strategies = [
-            RasterizationStrategy.all_touched,
-            RasterizationStrategy.combined,
-        ]
+        stats = cls.prepare_stats(strategy, shpfile, affine, layer, geography, True)
 
-        stats = []
-        if strategy in non_all_touched_strategies:
-            stats.append(
-                zonal_stats(
-                    shpfile,
-                    layer,
-                    stats="mean",
-                    affine=affine,
-                    geojson_out=True,
-                    all_touched=False,
-                    nodata=NO_DATA,
-                )
+        n = 0
+        step = 100
+        if len(stats) == 2:
+            # Combined strategy
+
+            iterator = zip(stats[0], stats[1])
+            zipped = True
+        else:
+            iterator = stats[0]
+            zipped = False
+
+        with tqdm() as pbar:
+            for s in iterator:
+                if zipped:
+                    s1, s2 = s
+                    record = cls._combine(key, s1, s2)
+                else:
+                    mean  = s['properties'][cls.statistics]
+                    props = [s['properties'][subkey] for subkey in key]
+                    prop = "".join(props)
+                    record = Record(value=mean, prop=prop)
+                if (n % step) == 0:
+                    pbar.update(step)
+                n += 1
+                yield record
+
+    @classmethod
+    def process_layers(
+            cls,
+            strategy: RasterizationStrategy,
+            shpfile: str,
+            affine: rasterio.Affine,
+            layers: List[Iterable],
+            geography: Geography
+    ) -> Iterable[MultiRecord]:
+        """
+        Given a layer, i.e. a slice of a dataframe, and a shapefile
+        returns an iterable of records, containing aggregated values
+        of the observations over the shapes in the shapefile.
+
+        :param strategy: Rasterization strategy to be used
+        :param shpfile: A path to shapefile to be used
+        :param affine: An optional affine transformation to be applied to
+            the coordinates
+        :param layers: A list of slices of dataframe, containing coordinates
+            and values
+        :param geography: WHat type of geography is to be used: zip codes
+            or counties
+        :return: An iterable of records, containing an identifier
+            of a certain shape with the aggregated value of the observation
+            for this shape
+        """
+
+        if strategy == RasterizationStrategy.combined:
+            raise IncompatibleArgumentsError(
+                "Combining all_tocuhed with default and multiple "
+                "variables is not implemented"
             )
-        if strategy in all_touched_strategies:
-            stats.append(
-                zonal_stats(
-                    shpfile,
-                    layer,
-                    stats="mean",
-                    affine=affine,
-                    geojson_out=True,
-                    all_touched=True,
-                    nodata=NO_DATA,
-                )
-            )
+        key = cls.get_key_for_geography(shpfile, geography)
 
-        if not len(stats[0]):
-            return
+        stats = (
+            cls.prepare_stats(strategy, shpfile, affine, layer, geography, True)[0]
+            for layer in layers
+        )
 
-        row = stats[0][0]
+        n = 0
+        step = 10
+        iterator = zip(*stats)
+        with tqdm() as pbar:
+            for ss in iterator:
+                means = [s['properties'][cls.statistics] for s in ss]
+                props_array = [
+                    [
+                        s['properties'][subkey] for subkey in key
+                    ] for s in ss
+                ]
+                props = {"".join(p) for p in props_array}
+                if len(props) != 1:
+                    raise AggregationError("Conflicting geo ids: " + str(props))
+                prop = next(iter(props))
+                record = MultiRecord(values=means, prop=prop)
+                if (n % step) == 0:
+                    pbar.update(step)
+                n += 1
+                yield record
 
-        for i in tqdm(range(len(stats[0])), total=len(stats[0])):
-            if len(stats) == 2:
-                # Combined strategy
-                mean, prop = cls._combine(key, stats[0][i], stats[1][i])
 
-            else:
-                mean = stats[0][i]['properties']['mean']
-                props = [stats[0][i]['properties'][subkey] for subkey in key]
-                prop = "".join(props)
+    @classmethod
+    def process_layers_return_dict(
+            cls,
+            strategy: RasterizationStrategy,
+            shpfile: str,
+            affine: rasterio.Affine,
+            layers: List[Iterable],
+            geography: Geography
+    ) -> Dict[str, MultiRecord]:
+        """
+        Given a layer, i.e. a slice of a dataframe, and a shapefile
+        returns an iterable of records, containing aggregated values
+        of the observations over the shapes in the shapefile.
 
-            yield Record(mean=mean, prop=prop)
+        :param strategy: Rasterization strategy to be used
+        :param shpfile: A path to shapefile to be used
+        :param affine: An optional affine transformation to be applied to
+            the coordinates
+        :param layers: A list of slices of dataframe, containing coordinates
+            and values
+        :param geography: WHat type of geography is to be used: zip codes
+            or counties
+        :return: A List of records, containing an identifier
+            of a certain shape with the aggregated value of the observation
+            for this shape
+        """
+
+        key = cls.get_key_for_geography(shpfile, geography)
+
+        records = dict()
+        for l1 in range(len(layers)):
+            layer = layers[l1]
+            stats = cls.prepare_stats(strategy, shpfile, affine, layer, geography, False)
+            for i in range(len(stats[0])):
+                if len(stats) == 2:
+                    # Combined strategy
+                    mean, prop = cls._combine(key, stats[0][i], stats[1][i])
+                else:
+                    mean = stats[0][i]['properties'][cls.statistics]
+                    props = [stats[0][i]['properties'][subkey] for subkey in key]
+                    prop = "".join(props)
+                if prop in records:
+                    record = records[prop]
+                else:
+                    record = MultiRecord([None for _ in range(l1)], prop)
+                    records[prop] = record
+                record.values.append(mean)
+            print('*', end=None)
+        print()
+        return records
+
+
 
     @classmethod
     def _determine_zip_key(cls, row) -> Tuple:
@@ -174,14 +339,14 @@ class StatsCounter:
                 raise ValueError("Unknown type of row: " + str(row))
         raise ValueError(f"None of the expected properties found ('{ candidates }'). Available: '{props}'")
 
-    @staticmethod
-    def _combine(key, r1, r2) -> Record:
+    @classmethod
+    def _combine(cls,key, r1, r2) -> Record:
         prop1 = "".join([r1['properties'][subkey] for subkey in key])
         prop2 = "".join([r2['properties'][subkey] for subkey in key])
         assert prop1 == prop2
 
-        m1 = r1['properties']['mean']
-        m2 = r2['properties']['mean']
+        m1 = r1['properties'][cls.statistics]
+        m2 = r2['properties'][cls.statistics]
         if m1 and m2:
             mean = (m1 + m2) / 2
         elif m2:
@@ -190,4 +355,12 @@ class StatsCounter:
             raise AssertionError("m1 && !m2")
         else:
             mean = None
-        return Record(mean=mean, prop=prop1)
+        return Record(value=mean, prop=prop1)
+
+
+class AggregationError(RuntimeError):
+    pass
+
+
+class IncompatibleArgumentsError(NotImplementedError):
+    pass

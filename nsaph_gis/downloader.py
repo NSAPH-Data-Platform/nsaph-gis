@@ -101,7 +101,7 @@ class GISDownloader:
                 opener = request.build_opener(proxy)
                 request.install_opener(opener)
 
-            with tqdm() as bar:
+            with tqdm(desc=f'Downloading {url}') as bar:
                 def report(blocknum, bs, size):
                     bar.total = size
                     bar.update(bs)

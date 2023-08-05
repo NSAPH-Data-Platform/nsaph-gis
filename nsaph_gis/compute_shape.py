@@ -5,6 +5,7 @@ and returns records containing
 an identifier for a geographic shape and the value of the band
 aggregated over the shape.
 """
+import os.path
 import sys
 #  Copyright (c) 2021. Harvard University
 #
@@ -177,7 +178,8 @@ class StatsCounter:
             iterator = stats[0]
             zipped = False
 
-        with tqdm() as pbar:
+        label = os.path.basename(shpfile)
+        with tqdm(file=sys.stdout, desc=f'Aggregating over {label}') as pbar:
             for s in iterator:
                 if zipped:
                     s1, s2 = s
@@ -234,7 +236,8 @@ class StatsCounter:
         n = 0
         step = 10
         iterator = zip(*stats)
-        with tqdm(file=sys.stdout) as pbar:
+        label = os.path.basename(shpfile)
+        with tqdm(file=sys.stdout, desc=f'Aggregating over {label}') as pbar:
             for ss in iterator:
                 means = [s['properties'][cls.statistics] for s in ss]
                 props_array = [

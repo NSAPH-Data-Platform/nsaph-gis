@@ -26,6 +26,9 @@ import zipfile
 from enum import Enum
 from typing import Tuple
 from urllib import request
+import ssl
+import certifi
+
 
 from tqdm import tqdm
 
@@ -102,6 +105,7 @@ class GISDownloader:
                 def report(blocknum, bs, size):
                     bar.total = size
                     bar.update(bs)
+                ssl._create_default_https_context = ssl._create_unverified_context
                 request.urlretrieve(url, dest, reporthook=report)
 
         with zipfile.ZipFile(dest, 'r') as zip_ref:

@@ -5,7 +5,7 @@ and returns records containing
 an identifier for a geographic shape and the value of the band
 aggregated over the shape.
 """
-
+import sys
 #  Copyright (c) 2021. Harvard University
 #
 #  Developed by Research Software Engineering,
@@ -234,7 +234,7 @@ class StatsCounter:
         n = 0
         step = 10
         iterator = zip(*stats)
-        with tqdm() as pbar:
+        with tqdm(file=sys.stdout) as pbar:
             for ss in iterator:
                 means = [s['properties'][cls.statistics] for s in ss]
                 props_array = [

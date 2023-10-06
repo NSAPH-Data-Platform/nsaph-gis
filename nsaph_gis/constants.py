@@ -46,3 +46,4 @@ class Geography(Enum):
     zcta = 'zcta'
     county = 'county'
     custom = 'custom'
+    all    = 'all'

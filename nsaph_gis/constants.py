@@ -9,7 +9,10 @@ from enum import Enum
 class RasterizationStrategy(Enum):
     """
     `Rasterization Strategy  <https://pythonhosted.org/rasterstats/manual.html#rasterization-strategy>`_
-    to rasterize a vector
+    to rasterize a vector.
+
+    While `downscale` strategy provides the best accuracy it requires
+    significantly more resources, especially RAM.
     """
 
     default = 'default'
@@ -35,6 +38,12 @@ class RasterizationStrategy(Enum):
     """
     A combination of "default" rasterization strategy with 
     affine transformation with downscaling factor = 5
+    
+    Effectively, the grid is interpolated with intermediate nodes,
+    increasing the number of nodes by the factor of 25 (5 x 5). Hence,
+    the accuracy is better, especially for complex and small shapes,
+    however, the aggregation will require 25 times more memory (RAM)
+    and will run slower.
     
     See `get_affine_transform <../../../gridmet/doc/gridmet_tools.html#gridmet.gridmet_tools.get_affine_transform>`_
     """

@@ -36,7 +36,8 @@ import shapefile
 
 from .constants import RasterizationStrategy, Geography
 
-NO_DATA = -999  # I do not know what it is, but not setting it causes a warning
+NO_DATA = 32767.0  # The value filled in masked arrays in NetCDF files
+    # for the masked cells
 
 
 @dataclass

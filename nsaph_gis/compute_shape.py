@@ -186,7 +186,16 @@ class StatsCounter:
                     s1, s2 = s
                     record = cls._combine(key, s1, s2)
                 else:
-                    mean  = s['properties'][cls.statistics]
+                    if isinstance(cls.statistics, list):
+                        values = [
+                            s['properties'][stat] for stat in cls.statistics
+                        ]
+                        mean = ':'.join([
+                            "{}={}".format(cls.statistics[i], str(values[i]))
+                            for i in range (len(cls.statistics))
+                        ])
+                    else:
+                        mean = s['properties'][cls.statistics]
                     props = [s['properties'][subkey] for subkey in key]
                     prop = "".join(props)
                     record = Record(value=mean, prop=prop)
@@ -295,6 +304,7 @@ class StatsCounter:
                     # Combined strategy
                     mean, prop = cls._combine(key, stats[0][i], stats[1][i])
                 else:
+
                     mean = stats[0][i]['properties'][cls.statistics]
                     props = [stats[0][i]['properties'][subkey] for subkey in key]
                     prop = "".join(props)

@@ -206,10 +206,10 @@ class StatsCounter:
                     props = [s['properties'][subkey] for subkey in key]
                     prop = "".join(props)
                     record = Record(value=mean, prop=prop)
-                m = mem()
-                if m > cls.max_mem_used:
-                    cls.max_mem_used = m
                 if (n % step) == 0:
+                    m = mem()
+                    if m > cls.max_mem_used:
+                        cls.max_mem_used = m
                     pbar.update(step)
                 if (n % step) == 0:
                     pbar.update(step)
@@ -276,10 +276,10 @@ class StatsCounter:
                     raise AggregationError("Conflicting geo ids: " + str(props))
                 prop = next(iter(props))
                 record = MultiRecord(values=means, prop=prop)
-                m = mem()
-                if m > cls.max_mem_used:
-                    cls.max_mem_used = m
                 if (n % step) == 0:
+                    m = mem()
+                    if m > cls.max_mem_used:
+                        cls.max_mem_used = m
                     pbar.update(step)
                 n += 1
                 yield record

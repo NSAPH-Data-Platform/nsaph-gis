@@ -34,6 +34,7 @@ from rasterstats import zonal_stats, gen_zonal_stats
 from tqdm import tqdm, trange
 import shapefile
 
+from nsaph_utils.utils.profile_utils import mem
 from .constants import RasterizationStrategy, Geography
 
 NO_DATA = 32767.0  # The value filled in masked arrays in NetCDF files
@@ -52,8 +53,10 @@ class MultiRecord:
     prop: str
 
 
+
 class StatsCounter:
     statistics = "mean"
+    max_mem_used = 0
     
     @classmethod
     def get_key_for_geography(cls, shpfile: str, geography: Geography) -> Tuple:
@@ -180,7 +183,11 @@ class StatsCounter:
             zipped = False
 
         label = os.path.basename(shpfile)
-        with tqdm(file=sys.stdout, desc=f'Aggregating over {label}') as pbar:
+        cls.max_mem_used = 0
+        with tqdm(
+                file=sys.stdout,
+                desc=f"Aggregating over {label} using '{strategy.value}' strategy"
+        ) as pbar:
             for s in iterator:
                 if zipped:
                     s1, s2 = s
@@ -199,6 +206,11 @@ class StatsCounter:
                     props = [s['properties'][subkey] for subkey in key]
                     prop = "".join(props)
                     record = Record(value=mean, prop=prop)
+                m = mem()
+                if m > cls.max_mem_used:
+                    cls.max_mem_used = m
+                if (n % step) == 0:
+                    pbar.update(step)
                 if (n % step) == 0:
                     pbar.update(step)
                 n += 1
@@ -247,7 +259,11 @@ class StatsCounter:
         step = 10
         iterator = zip(*stats)
         label = os.path.basename(shpfile)
-        with tqdm(file=sys.stdout, desc=f'Aggregating over {label}') as pbar:
+        cls.max_mem_used = 0
+        with tqdm(
+                file=sys.stdout,
+                desc=f"Aggregating over {label} using '{strategy.value}' strategy"
+        ) as pbar:
             for ss in iterator:
                 means = [s['properties'][cls.statistics] for s in ss]
                 props_array = [
@@ -260,6 +276,9 @@ class StatsCounter:
                     raise AggregationError("Conflicting geo ids: " + str(props))
                 prop = next(iter(props))
                 record = MultiRecord(values=means, prop=prop)
+                m = mem()
+                if m > cls.max_mem_used:
+                    cls.max_mem_used = m
                 if (n % step) == 0:
                     pbar.update(step)
                 n += 1

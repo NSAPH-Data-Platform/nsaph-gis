@@ -34,7 +34,7 @@ from rasterstats import zonal_stats, gen_zonal_stats
 from tqdm import tqdm, trange
 import shapefile
 
-from nsaph_utils.utils.profile_utils import mem
+from nsaph_utils.utils.profile_utils import mem, qmem, qqmem
 from .constants import RasterizationStrategy, Geography
 
 NO_DATA = 32767.0  # The value filled in masked arrays in NetCDF files
@@ -184,6 +184,7 @@ class StatsCounter:
 
         label = os.path.basename(shpfile)
         cls.max_mem_used = 0
+        pid = os.getpid()
         with tqdm(
                 file=sys.stdout,
                 desc=f"Aggregating over {label} using '{strategy.value}' strategy"
@@ -206,6 +207,9 @@ class StatsCounter:
                     props = [s['properties'][subkey] for subkey in key]
                     prop = "".join(props)
                     record = Record(value=mean, prop=prop)
+                m = qqmem(pid)
+                if m > cls.max_mem_used:
+                    cls.max_mem_used = m
                 if (n % step) == 0:
                     m = mem()
                     if m > cls.max_mem_used:
@@ -260,6 +264,7 @@ class StatsCounter:
         iterator = zip(*stats)
         label = os.path.basename(shpfile)
         cls.max_mem_used = 0
+        pid = os.getpid()
         with tqdm(
                 file=sys.stdout,
                 desc=f"Aggregating over {label} using '{strategy.value}' strategy"
@@ -276,6 +281,9 @@ class StatsCounter:
                     raise AggregationError("Conflicting geo ids: " + str(props))
                 prop = next(iter(props))
                 record = MultiRecord(values=means, prop=prop)
+                m = qqmem(pid)
+                if m > cls.max_mem_used:
+                    cls.max_mem_used = m
                 if (n % step) == 0:
                     m = mem()
                     if m > cls.max_mem_used:

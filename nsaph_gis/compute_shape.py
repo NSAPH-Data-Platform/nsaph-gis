@@ -37,8 +37,10 @@ import shapefile
 from nsaph_utils.utils.profile_utils import mem, qmem, qqmem
 from .constants import RasterizationStrategy, Geography
 
-NO_DATA = 32767.0  # The value filled in masked arrays in NetCDF files
-    # for the masked cells
+NO_DATA = 32767.0  # The default value filled in masked arrays in NetCDF files
+# for the masked cells
+# This value is overridden if it is defined by a property "missing_value"
+# in the metadata of the NetCDF file
 
 
 @dataclass
@@ -53,11 +55,10 @@ class MultiRecord:
     prop: str
 
 
-
 class StatsCounter:
     statistics = "mean"
     max_mem_used = 0
-    
+
     @classmethod
     def get_key_for_geography(cls, shpfile: str, geography: Geography) -> Tuple:
         shape = shapefile.Reader(shpfile)
@@ -74,27 +75,20 @@ class StatsCounter:
         return key
 
     @classmethod
-    def prepare_stats(
-            cls,
-            strategy: RasterizationStrategy,
-            shpfile: str,
-            affine: rasterio.Affine,
-            layer: Iterable,
-            geography: Geography,
-            is_generator: bool
-    ) -> List:
+    def prepare_stats(cls, strategy: RasterizationStrategy, shpfile: str,
+                      affine: rasterio.Affine, layer: Iterable, no_data,
+                      is_generator: bool) -> List:
         """
         Given a layer, i.e. a slice of a dataframe, and a shapefile
         returns an iterable of records, containing aggregated values
         of the observations over the shapes in the shapefile.
 
+        :param no_data: Value taht is treated as missing value
         :param strategy: Rasterization strategy to be used
         :param shpfile: A path to shapefile to be used
         :param affine: An optional affine transformation to be applied to
             the coordinates
         :param layer: A slice of dataframe, containing coordinates and values
-        :param geography: WHat type of geography is to be used: zip codes
-            or counties
         :return: A list of statistics compute objects
         """
 
@@ -110,6 +104,7 @@ class StatsCounter:
         ]
         all_touched_strategies = [
             RasterizationStrategy.all_touched,
+            RasterizationStrategy.auto,
             RasterizationStrategy.combined,
         ]
 
@@ -123,7 +118,7 @@ class StatsCounter:
                     affine=affine,
                     geojson_out=True,
                     all_touched=False,
-                    nodata=NO_DATA,
+                    nodata=no_data,
                 )
             )
         if strategy in all_touched_strategies:
@@ -135,7 +130,7 @@ class StatsCounter:
                     affine=affine,
                     geojson_out=True,
                     all_touched=True,
-                    nodata=NO_DATA,
+                    nodata=no_data,
                 )
             )
 
@@ -143,18 +138,20 @@ class StatsCounter:
 
     @classmethod
     def process(
-        cls,
-        strategy: RasterizationStrategy,
-        shpfile: str,
-        affine: rasterio.Affine,
-        layer: Iterable,
-        geography: Geography
+            cls,
+            strategy: RasterizationStrategy,
+            shpfile: str,
+            affine: rasterio.Affine,
+            layer: Iterable,
+            geography: Geography,
+            no_data=None
     ) -> Iterable[Record]:
         """
         Given a layer, i.e. a slice of a dataframe, and a shapefile 
         returns an iterable of records, containing aggregated values
         of the observations over the shapes in the shapefile. 
         
+        :param no_data: Values that is treated as missing value
         :param strategy: Rasterization strategy to be used
         :param shpfile: A path to shapefile to be used
         :param affine: An optional affine transformation to be applied to
@@ -167,9 +164,13 @@ class StatsCounter:
             for this shape
         """
 
+        if no_data is None:
+            no_data = NO_DATA
         key = cls.get_key_for_geography(shpfile, geography)
 
-        stats = cls.prepare_stats(strategy, shpfile, affine, layer, geography, True)
+        stats = cls.prepare_stats(
+            strategy, shpfile, affine, layer, no_data, True
+        )
 
         n = 0
         step = 100
@@ -200,7 +201,7 @@ class StatsCounter:
                         ]
                         mean = ':'.join([
                             "{}={}".format(cls.statistics[i], str(values[i]))
-                            for i in range (len(cls.statistics))
+                            for i in range(len(cls.statistics))
                         ])
                     else:
                         mean = s['properties'][cls.statistics]
@@ -255,7 +256,8 @@ class StatsCounter:
         key = cls.get_key_for_geography(shpfile, geography)
 
         stats = (
-            cls.prepare_stats(strategy, shpfile, affine, layer, geography, True)[0]
+            cls.prepare_stats(strategy, shpfile, affine, layer, NO_DATA,
+                              True)[0]
             for layer in layers
         )
 
@@ -292,7 +294,6 @@ class StatsCounter:
                 n += 1
                 yield record
 
-
     @classmethod
     def process_layers_return_dict(
             cls,
@@ -325,7 +326,8 @@ class StatsCounter:
         records = dict()
         for l1 in range(len(layers)):
             layer = layers[l1]
-            stats = cls.prepare_stats(strategy, shpfile, affine, layer, geography, False)
+            stats = cls.prepare_stats(strategy, shpfile, affine, layer, NO_DATA,
+                                      False)
             for i in range(len(stats[0])):
                 if len(stats) == 2:
                     # Combined strategy
@@ -333,7 +335,8 @@ class StatsCounter:
                 else:
 
                     mean = stats[0][i]['properties'][cls.statistics]
-                    props = [stats[0][i]['properties'][subkey] for subkey in key]
+                    props = [stats[0][i]['properties'][subkey] for subkey in
+                             key]
                     prop = "".join(props)
                 if prop in records:
                     record = records[prop]
@@ -344,8 +347,6 @@ class StatsCounter:
             print('*', end=None)
         print()
         return records
-
-
 
     @classmethod
     def _determine_zip_key(cls, row) -> Tuple:
@@ -378,10 +379,13 @@ class StatsCounter:
                 props = row
             else:
                 raise ValueError("Unknown type of row: " + str(row))
-        raise ValueError(f"None of the expected properties found ('{ candidates }'). Available: '{props}'")
+        raise ValueError(
+            f"None of the expected properties found ('{candidates}'). "
+            + f"Available: '{props}'"
+        )
 
     @classmethod
-    def _combine(cls,key, r1, r2) -> Record:
+    def _combine(cls, key, r1, r2) -> Record:
         prop1 = "".join([r1['properties'][subkey] for subkey in key])
         prop2 = "".join([r2['properties'][subkey] for subkey in key])
         assert prop1 == prop2
